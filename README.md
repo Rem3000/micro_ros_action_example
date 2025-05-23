@@ -5,8 +5,11 @@
 
 git clone下來後，使用vscode打開下載好的資料夾，如果有打開自動儲存（或是按下除存）的話會出現.pio資料夾
 ![alt text](image.png)
+
 點開.pio/micro_ros_platformio資料夾下打開metas資料夾點擊colcon.meta
+
 ![alt text](image-1.png)
+
 將"-DRMW_UXRCE_MAX_SERVICES=1" 修改成"-DRMW_UXRCE_MAX_SERVICES=3"
 補充一下，一個action至少會用到3個服務，由於單晶片性能有限，會在詭異的地方省資源
 
@@ -14,7 +17,9 @@ git clone下來後，使用vscode打開下載好的資料夾，如果有打開�
 ！！！一定得做，關係到最後一步action的編譯能不能過！！！
 
 接下來可以把.pio資料夾折起來，在最上層資料夾看到extra_packages這個資料夾
+
 ![alt text](image-2.png)
+
 打開TERMINAL進入extra_packages這個資料夾下方後，輸入colcon build編譯
 最後按下Ctrl+Alt+B讓platformIDE重新編譯
 
@@ -22,4 +27,5 @@ git clone下來後，使用vscode打開下載好的資料夾，如果有打開�
 在開啟另一個TERMINAL輸入
 ros2 action send_goal /move_distance bot_interfaces/action/MoveDistance "{goal: 20.0}" --feedback
 就能查看有沒有成功了
+
 ![alt text](image-4.png)
