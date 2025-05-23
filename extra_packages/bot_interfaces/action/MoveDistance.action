@@ -1,0 +1,10 @@
+# Goal: 目標位置
+float32 goal
+
+---
+# Result: 最终的结果
+bool success
+
+---
+# Feedback: 反馈
+float32 feedback
