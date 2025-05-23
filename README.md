@@ -22,7 +22,7 @@ git clone下來後，使用vscode打開下載好的資料夾，如果有打開�
 
 打開TERMINAL進入extra_packages這個資料夾下方後，輸入colcon build編譯
 最後按下Ctrl+Alt+B讓platformIDE重新編譯
-
+同時把extra_packages下的bot_interfaces複製一分到你的ros2_ws/src下，再回到ros2_ws colcon build編譯
 完成後開啟TERMINAL連結上micro_ros_agent 
 在開啟另一個TERMINAL輸入
 ros2 action send_goal /move_distance bot_interfaces/action/MoveDistance "{goal: 20.0}" --feedback
