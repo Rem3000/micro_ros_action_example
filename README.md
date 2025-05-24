@@ -30,7 +30,8 @@ git clone https://github.com/Rem3000/micro_ros_action_example.git
 
 3.	修改 colcon.meta 設定
 
-開啟 .pio/micro_ros_platformio/metas/colcon.meta，
+開啟 .pio/micro_ros_platformio/metas/colcon.meta
+
 將原本的：
 ```
 -DRMW_UXRCE_MAX_SERVICES=1
@@ -48,7 +49,7 @@ git clone https://github.com/Rem3000/micro_ros_action_example.git
 
 請務必刪除以下資料夾：
 ```
-.pio/micro_ros_platformio/libmicror
+.pio/micro_ros_platformio/libmicroros
 ```
 否則會因快取導致後續編譯失敗。
 
