@@ -81,6 +81,7 @@ ros2 run micro_ros_agent micro_ros_agent serial --dev /dev/ttyACM0
 ```
 如果不知道怎麼啟動的話可以到
 https://fishros.com/d2lros2/#/humble/chapt16/17.%E6%8B%93%E5%B1%95-%E6%BA%90%E7%A0%81%E7%BC%96%E8%AF%91Agent
+
 2.	發送 Action 測試
 
 在另一個終端機中執行：
@@ -88,7 +89,8 @@ https://fishros.com/d2lros2/#/humble/chapt16/17.%E6%8B%93%E5%B1%95-%E6%BA%90%E7%
 ros2 action send_goal /move_distance bot_interfaces/action/MoveDistance "{goal: 20.0}" --feedback
 ```
 你應該會看到 ESP32 回傳的 feedback，最後回傳結果。
-##注意事項
+
+## 注意事項
 	請務必將 RMW_UXRCE_MAX_SERVICES 設為 3，否則無法成功使用 Action。
 	libmicror 資料夾刪除後才會強制重建 micro-ROS 套件。
 	若遇到編譯錯誤，可嘗試整個刪除 .pio 後重新來一次。
