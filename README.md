@@ -73,7 +73,7 @@ cp -r extra_packages/bot_interfaces ~/ros2_ws/src/
 cd ~/ros2_ws
 colcon build
 ```
-##執行測試
+## 執行測試
 
 1.	啟動 micro-ROS Agent
 ```
