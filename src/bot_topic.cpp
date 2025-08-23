@@ -30,10 +30,8 @@ void goal_callback(rcl_timer_t *timer, int64_t last_call_time) {
     (void) last_call_time;
     
     if (timer == NULL || !goal_active || g_goal_handle == NULL) {
-        result.result.success = false;
         return;
     }
-
 
     // 發布 feedback
     feedback.feedback.feedback = main_goal-error_goal;//也可以選擇feedback error_goal
@@ -73,6 +71,7 @@ rcl_ret_t handle_goal(rclc_action_goal_handle_t *goal_handle, void *context){
      g_goal_handle = goal_handle;
      return RCL_RET_ACTION_GOAL_ACCEPTED;
 }
+
 bool handle_cancel(rclc_action_goal_handle_t * goal_handle, void * context) {
     (void) context;
     (void) goal_handle;
@@ -101,7 +100,7 @@ void loop_bot_control()
 
 
 void initializeHardware(){
-    // 初始化引脚模式
+    // 初始化引脚
 
 }
 
@@ -191,8 +190,8 @@ bool create_bot_transport()
         &executor,
         &action_server,
         1,  // handles_number
-        &feedback,
-        sizeof(bot_interfaces__action__MoveDistance_Feedback),
+        &support,
+        sizeof(bot_interfaces__action__MoveDistance_SendGoal_Request),
         handle_goal,
         handle_cancel,
         (void *)&action_server
