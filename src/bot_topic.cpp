@@ -190,7 +190,7 @@ bool create_bot_transport()
         &executor,
         &action_server,
         1,  // handles_number
-        &support,
+        &feedback,
         sizeof(bot_interfaces__action__MoveDistance_SendGoal_Request),
         handle_goal,
         handle_cancel,
