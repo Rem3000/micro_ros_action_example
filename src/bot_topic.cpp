@@ -2,6 +2,8 @@
 /*==================MicroROS訂閱發布服務動作========================*/
 bot_interfaces__action__MoveDistance_FeedbackMessage feedback;
 bot_interfaces__action__MoveDistance_GetResult_Response result={0};
+// 存放收到的 goal request（數量需與 rclc_executor_add_action_server 的 handles_number 相同）
+bot_interfaces__action__MoveDistance_SendGoal_Request ros_goal_request[1];
 /*==================MicroROS執行器&節點==================*/
 rclc_executor_t executor;
 rclc_support_t support;
@@ -13,8 +15,9 @@ rcl_timer_t timer;
 rclc_action_server_t action_server;
 rclc_action_goal_handle_t *g_goal_handle = NULL;
 
-uint8_t pwm = 0;float main_goal = 0;float error_goal=0;
-bool goal_active = false;
+// 以下變數會同時被 microros_task(核心0) 與 loop(核心1) 存取，需加 volatile
+uint8_t pwm = 0;volatile float main_goal = 0;volatile float error_goal=0;
+volatile bool goal_active = false;
 Adafruit_NeoPixel pixels(NUM_PIXELS, LED_PIN, NEO_GRB + NEO_KHZ800);
 float front_length = 0, rear_length = 0;
 enum states
@@ -33,25 +36,25 @@ void goal_callback(rcl_timer_t *timer, int64_t last_call_time) {
         return;
     }
 
+    // 處理 cancel（先檢查，確保取消請求能被回應）
+    if (g_goal_handle->goal_cancelled) {
+        result.result.success = false;
+        goal_active = false;
+        RCSOFTCHECK(rclc_action_send_result(g_goal_handle, GOAL_STATE_CANCELED, &result));
+        g_goal_handle = NULL;
+        return;
+    }
+
     // 發布 feedback
     feedback.feedback.feedback = main_goal-error_goal;//也可以選擇feedback error_goal
-    rclc_action_publish_feedback(g_goal_handle, &feedback);
+    RCSOFTCHECK(rclc_action_publish_feedback(g_goal_handle, &feedback));
 
     // 檢查是否完成
     float error = fabs(main_goal - error_goal);
     if (error <= 0.1) {
         result.result.success = true;
-        rclc_action_send_result(g_goal_handle, GOAL_STATE_SUCCEEDED, &result);
         goal_active = false;
-        g_goal_handle = NULL;
-        return;
-    }
-
-    // 處理 cancel
-    if (g_goal_handle->goal_cancelled) {
-        result.result.success = false;
-        rclc_action_send_result(g_goal_handle, GOAL_STATE_CANCELED, &result);
-        goal_active = false;
+        RCSOFTCHECK(rclc_action_send_result(g_goal_handle, GOAL_STATE_SUCCEEDED, &result));
         g_goal_handle = NULL;
         return;
     }
@@ -61,15 +64,20 @@ rcl_ret_t handle_goal(rclc_action_goal_handle_t *goal_handle, void *context){
     (void)context;
 
     auto *req = (bot_interfaces__action__MoveDistance_SendGoal_Request *)goal_handle->ros_goal_request;
-    goal_active = true;
-    // 取得目標值
-    main_goal = req->goal.goal;
-    // 目標值不在範圍直接拒絕
-    if (main_goal > 50.0 || main_goal < 0.0) {
+    // 已有執行中的目標時拒絕新目標
+    if (goal_active) {
         return RCL_RET_ACTION_GOAL_REJECTED;
     }
-     g_goal_handle = goal_handle;
-     return RCL_RET_ACTION_GOAL_ACCEPTED;
+    // 目標值不在範圍直接拒絕（必須在修改狀態之前檢查）
+    float new_goal = req->goal.goal;
+    if (new_goal > 50.0 || new_goal < 0.0) {
+        return RCL_RET_ACTION_GOAL_REJECTED;
+    }
+    // 取得目標值
+    main_goal = new_goal;
+    g_goal_handle = goal_handle;
+    goal_active = true;
+    return RCL_RET_ACTION_GOAL_ACCEPTED;
 }
 
 bool handle_cancel(rclc_action_goal_handle_t * goal_handle, void * context) {
@@ -84,16 +92,18 @@ bool handle_cancel(rclc_action_goal_handle_t * goal_handle, void * context) {
 
 void loop_bot_control()
 {    
-  if(goal_active && g_goal_handle && error_goal < main_goal)
-  {
-    error_goal = error_goal + 0.1;
-  }else if(goal_active && g_goal_handle && error_goal > main_goal)
-  {
-    error_goal = error_goal - 0.1;
-  }else
-  {
+  // 沒有執行中的目標（或已取消）時保持目前位置
+  if (!goal_active) {
+    return;
+  }
+  float diff = main_goal - error_goal;
+  if (fabs(diff) <= 0.1) {
     error_goal = main_goal;
-  } 
+  } else if (diff > 0) {
+    error_goal = error_goal + 0.1;
+  } else {
+    error_goal = error_goal - 0.1;
+  }
 }
 
 
@@ -166,14 +176,14 @@ bool create_bot_transport()
     delay(500);
     // 預設的記憶體分配器 allocator
     allocator = rcl_get_default_allocator();
-    // RCSOFTCHECK 是一個巨集，用來檢查函式執行結果是否錯誤，若錯誤會印出錯誤訊息並結束程式。
+    // RCRETCHECK 是一個巨集，用來檢查函式執行結果，若錯誤會直接回傳 false 讓狀態機重新連線。
     const unsigned int timer_timeout = 50;
     // 呼叫 rclc_support_init 初始化 ROS 2 執行時支援庫，傳入 allocator
-    RCSOFTCHECK(rclc_support_init(&support, 0, NULL, &allocator));
+    RCRETCHECK(rclc_support_init(&support, 0, NULL, &allocator));
     // 呼叫 rclc_node_init_default 初始化 ROS 2 節點，傳入節點名稱、命名空間與支援庫
-    RCSOFTCHECK(rclc_node_init_default(&node, "esp32_action", "", &support));
+    RCRETCHECK(rclc_node_init_default(&node, "esp32_action", "", &support));
     // 使用預設設定建立動作服務器
-    RCSOFTCHECK(rclc_action_server_init_default(
+    RCRETCHECK(rclc_action_server_init_default(
         &action_server,
         &node,
         &support,
@@ -182,28 +192,32 @@ bool create_bot_transport()
     ));
  
     // 呼叫 rclc_timer_init_default 初始化 ROS 2 計時器，傳入支援庫、計時器週期與回呼函式
-    RCSOFTCHECK(rclc_timer_init_default(&timer, &support, RCL_MS_TO_NS(timer_timeout), goal_callback));
+    RCRETCHECK(rclc_timer_init_default(&timer, &support, RCL_MS_TO_NS(timer_timeout), goal_callback));
     // 呼叫 rclc_executor_init 初始化 ROS 2 執行器，傳入支援庫、執行緒數量與記憶體分配器
-    RCSOFTCHECK(rclc_executor_init(&executor, &support.context, 6, &allocator));
-    // 呼叫 rclc_executor_add_action_server 將動作服務器加入執行器，傳入執行器、服務器、handle 數量、feedback、feedback 大小、goal/cancel 回呼與 context
-    rclc_executor_add_action_server(
+    RCRETCHECK(rclc_executor_init(&executor, &support.context, 6, &allocator));
+    // 呼叫 rclc_executor_add_action_server 將動作服務器加入執行器，傳入執行器、服務器、handle 數量、goal request 緩衝區與其大小、goal/cancel 回呼與 context
+    // 注意：第 4 個參數是用來存放 goal request 的緩衝區，不可傳入 feedback
+    RCRETCHECK(rclc_executor_add_action_server(
         &executor,
         &action_server,
         1,  // handles_number
-        &feedback,
+        ros_goal_request,
         sizeof(bot_interfaces__action__MoveDistance_SendGoal_Request),
         handle_goal,
         handle_cancel,
         (void *)&action_server
-    );
+    ));
     // 呼叫 rclc_executor_add_timer 將計時器加入執行器，傳入執行器與計時器。
-    RCSOFTCHECK(rclc_executor_add_timer(&executor, &timer));
+    RCRETCHECK(rclc_executor_add_timer(&executor, &timer));
     return true;
 }
 
 // 用於釋放 ROS 2 節點中的相關資源
 bool destory_bot_transport()
 {  
+    // 連線中斷時目前的 goal handle 會失效，清除目標狀態
+    goal_active = false;
+    g_goal_handle = NULL;
     // 取得 ROS 2 context 中的 RMW context，並指派給 rmw_context 變數
     rmw_context_t *rmw_context = rcl_context_get_rmw_context(&support.context);
     // 設定 RMW context 的實體銷毀會話逾時為 0，代表立即返回不等待逾時
@@ -258,7 +272,7 @@ void RGB(uint8_t r, uint8_t g, uint8_t b, uint8_t Brightness, bool Brightness_on
     else
     {
       light ++;
-      if(light == Brightness)
+      if(light >= Brightness)
       {
         updown = true;
       }

@@ -21,7 +21,8 @@
 extern Adafruit_NeoPixel pixels;
 
 #define RCCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)){RGB(20, 20, 20,50,true);}}
-#define RCSOFTCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)) {} else {}}
+#define RCSOFTCHECK(fn) { rcl_ret_t temp_rc = fn; (void)temp_rc; }
+#define RCRETCHECK(fn) { rcl_ret_t temp_rc = fn; if((temp_rc != RCL_RET_OK)) { return false; } }
 #define EXECUTE_EVERY_N_MS(MS, X)          \
     do                                     \
     {                                      \
@@ -38,7 +39,7 @@ extern Adafruit_NeoPixel pixels;
     } while (0);
 
 
-rcl_ret_t goal_callback(rclc_action_goal_handle_t *goal_handle, void *context);
+void goal_callback(rcl_timer_t *timer, int64_t last_call_time);
 rcl_ret_t handle_goal(rclc_action_goal_handle_t *goal_handle, void *context);
 bool handle_cancel(rclc_action_goal_handle_t * goal_handle, void * context) ;
 void loop_bot_control();
