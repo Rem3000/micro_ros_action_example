@@ -1,3 +1,4 @@
+#pragma once
 /*
  * @Author: lalala123 1054060225@qq.com
  * @Date: 2023-03-23 17:23:07
